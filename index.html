@@ -1,0 +1,1127 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Catálogo de Gaitas</title>
+    <!-- Carga de Tailwind CSS para el diseño -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Carga de SortableJS para Drag and Drop en la fila -->
+    <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.2/Sortable.min.js"></script>
+    <style>
+        /* Estilos generales y fijos */
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #121212; /* Fondo Oscuro (Spotify/YouTube Music) */
+            color: #EAEAEA; /* Texto principal claro */
+            padding-bottom: 90px;
+        }
+        .container-bg {
+            background-color: #1f1f1f; /* Contenedores/Tarjetas ligeramente más claros */
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.5);
+        }
+        /* Estilo para resaltar el texto buscado */
+        mark {
+            background-color: #4CAF50; /* Verde brillante para el resaltado */
+            color: #121212;
+            padding: 0 2px;
+            border-radius: 4px;
+        }
+        /* Controles de Formulario */
+        input, select {
+            background-color: #2a2a2a !important;
+            border-color: #444 !important;
+            color: #fff !important;
+            min-height: 44px; /* Altura mínima para tocar en móvil */
+        }
+        input:focus, select:focus {
+            border-color: #1DB954 !important; /* Verde de Spotify */
+            box-shadow: 0 0 0 1px #1DB954 !important;
+        }
+
+        /* Contenedor del Autocompletado */
+        #autocomplete-container {
+            position: relative;
+        }
+        #autocomplete-list {
+            position: absolute;
+            z-index: 10;
+            top: 100%;
+            left: 0;
+            right: 0;
+            border: 1px solid #333;
+            border-top: none;
+            max-height: 200px;
+            overflow-y: auto;
+            background-color: #2a2a2a;
+            border-radius: 0 0 8px 8px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.5);
+        }
+        .autocomplete-item {
+            padding: 10px 12px; /* Aumentado padding para toque fácil */
+            cursor: pointer;
+            font-size: 0.875rem;
+            color: #EAEAEA;
+            transition: background-color 0.15s;
+        }
+        .autocomplete-item:hover {
+            background-color: #383838;
+        }
+
+        /* Reproductor Flotante */
+        #floating-player-ui {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            z-index: 50;
+            border-top: 1px solid #333;
+            background-color: #181818; /* Aún más oscuro */
+        }
+        
+        /* Estilos para Drag and Drop en la Fila */
+        .queue-item.sortable-ghost {
+            opacity: 0.5;
+            background-color: #3b3b3b;
+            border: 1px dashed #1DB954; /* Verde Spotify */
+        }
+        .queue-item {
+            cursor: grab;
+        }
+        
+        /* Modal de la Fila (Modal/Sidebar) */
+        #queue-modal > div {
+            background-color: #1f1f1f;
+            color: #EAEAEA;
+        }
+        #queue-modal header {
+             background-color: #1f1f1f;
+             border-color: #333;
+        }
+        /* Ajuste para que el modal de la fila sea de ancho completo en móvil */
+        @media (max-width: 767px) {
+            #queue-modal > div {
+                max-width: 100%; /* Cubre todo el ancho del móvil */
+            }
+        }
+    </style>
+</head>
+<body class="p-4 md:p-8">
+    <div id="app" class="max-w-7xl mx-auto">
+        
+        <!-- Encabezado y Título -->
+        <header class="text-center mb-8">
+            <h1 class="text-4xl font-extrabold text-[#1DB954]">Catálogo de Gaita Zuliana</h1>
+            <p class="text-gray-400 mt-2">Busca, filtra y explora temas por agrupación, artista, año, autor y compositor.</p>
+        </header>
+
+        <!-- Controles de Búsqueda y Filtro (Optimizados para Móvil) -->
+        <div class="container-bg p-4 md:p-6 rounded-xl mb-8 flex flex-col md:flex-row gap-4">
+            
+            <!-- Barra de Búsqueda General (Ocupa 100% en móvil) -->
+            <div class="w-full md:w-1/2" id="autocomplete-container">
+                <label for="search-input" class="block text-sm font-medium text-gray-400 mb-1">Búsqueda General</label>
+                <input type="text" id="search-input" placeholder="Buscar por palabra clave..." class="w-full p-3 border border-gray-300 rounded-lg">
+                <!-- Lista de sugerencias de autocompletado -->
+                <div id="autocomplete-list"></div>
+            </div>
+
+            <!-- Filtro por Año (Ocupa 100% en móvil, 1/4 en desktop) -->
+            <div class="w-full md:w-1/4">
+                <label for="year-select" class="block text-sm font-medium text-gray-400 mb-1">Filtrar por Año</label>
+                <select id="year-select" class="w-full p-3 border border-gray-300 rounded-lg">
+                    <option value="">Todos los Años</option>
+                    <!-- Las opciones se llenarán con JavaScript -->
+                </select>
+            </div>
+
+            <!-- Control de Ordenamiento (Ocupa 100% en móvil, 1/4 en desktop) -->
+            <div class="w-full md:w-1/4">
+                <label for="sort-select" class="block text-sm font-medium text-gray-400 mb-1">Ordenar por</label>
+                <select id="sort-select" class="w-full p-3 border border-gray-300 rounded-lg">
+                    <option value="id_asc">Por defecto</option>
+                    <option value="agrupacion_asc">Agrupación (A-Z)</option>
+                    <option value="agrupacion_desc">Agrupación (Z-A)</option>
+                    <option value="tema_asc">Tema (A-Z)</option>
+                    <option value="tema_desc">Tema (Z-A)</option>
+                    <option value="año_desc">Año (Más Nuevo)</option>
+                    <option value="año_asc">Año (Más Antiguo)</option>
+                </select>
+            </div>
+        </div>
+
+        <!-- Sección de Resultados -->
+        <div class="mb-4 text-gray-400 flex justify-between items-center px-1">
+            <div>
+                <span id="result-count" class="font-semibold text-lg">0</span> resultados encontrados.
+                <span id="display-count" class="text-sm text-gray-500"></span>
+            </div>
+        </div>
+
+        <div id="results-container" class="space-y-4">
+            <!-- Los resultados de la lista se inyectarán aquí -->
+            <p id="loading-message" class="text-center text-lg text-[#1DB954] p-8 container-bg rounded-xl">Cargando datos desde Google Sheets...</p>
+        </div>
+
+        <!-- Botones de Paginación/Carga -->
+        <div id="pagination-controls" class="flex flex-col sm:flex-row justify-center gap-3 mt-8">
+            <!-- Los botones se inyectarán aquí -->
+        </div>
+
+        <div id="error-message" class="hidden text-center bg-red-900 border border-red-600 text-red-300 px-4 py-3 rounded-xl mt-8">
+            <strong class="font-bold">Error al cargar o procesar los datos:</strong> La aplicación no pudo conectarse con Google Sheets. Verifica la consola para más detalles o asegúrate de que el enlace de publicación sea accesible.
+        </div>
+    </div>
+    
+    <!-- Reproductor Flotante Fijo -->
+    <div id="floating-player-ui" class="hidden bg-gray-900 text-white p-3 shadow-2xl">
+        <div class="max-w-7xl mx-auto flex items-center justify-between">
+            
+            <!-- Info de la Canción (W-1/3) -->
+            <div class="flex-1 min-w-0 mr-4">
+                <p id="player-title" class="font-bold truncate text-sm text-white">Ningún tema seleccionado</p>
+                <p id="player-artist" class="text-xs text-gray-400 truncate">Agrega temas a la fila.</p>
+            </div>
+
+            <!-- Controles (W-1/3) -->
+            <div class="flex items-center space-x-4">
+                <button id="prev-btn" title="Anterior" class="text-gray-400 hover:text-white disabled:opacity-50">
+                    <svg class="w-6 h-6" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clip-rule="evenodd"></path></svg>
+                </button>
+                <button id="play-pause-btn" title="Reproducir" class="text-white hover:text-[#1DB954] transition">
+                    <svg id="play-icon" class="w-8 h-8" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clip-rule="evenodd"></path></svg>
+                    <svg id="pause-icon" class="w-8 h-8 hidden" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zM7 8a1 1 0 012 0v4a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v4a1 1 0 102 0V8a1 1 0 00-1-1z" clip-rule="evenodd"></path></svg>
+                </button>
+                <button id="next-btn" title="Siguiente" class="text-gray-400 hover:text-white disabled:opacity-50">
+                    <svg class="w-6 h-6" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clip-rule="evenodd" transform="rotate(180 10 10)"></path></svg>
+                </button>
+            </div>
+
+            <!-- Controles de volumen y Fila (W-1/3) -->
+            <div class="flex items-center space-x-4 ml-4">
+                <!-- Elemento de Audio Real (Oculto) -->
+                <audio id="audio-element" style="display:none;"></audio>
+
+                <!-- Control de Volumen (Simplificado) -->
+                <div class="hidden sm:flex items-center">
+                    <svg class="w-4 h-4 mr-2 text-gray-400" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M9.383 3.076A1 1 0 0110 4v12a1 1 0 01-1.707.707L4.586 13H2a1 1 0 01-1-1V8a1 1 0 011-1h2.586l3.707-3.707a1 1 0 011.09-.217zM14.657 5.793a1 1 0 00-1.414 0 6.002 6.002 0 010 8.484 1 1 0 001.414 0 8.002 8.002 0 000-11.312z" clip-rule="evenodd"></path></svg>
+                    <input type="range" id="volume-slider" min="0" max="1" step="0.01" value="1" class="w-16 h-1 bg-gray-600 rounded-lg appearance-none cursor-pointer">
+                </div>
+
+                <!-- Botón de Fila/Playlist (Abre un modal virtual) -->
+                <button id="queue-btn" class="relative px-3 py-1 text-sm rounded-lg bg-[#535353] hover:bg-[#686868] transition text-white">
+                    Fila (<span id="queue-count">0</span>)
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal de la Fila de Reproducción -->
+    <div id="queue-modal" class="fixed inset-0 bg-gray-900 bg-opacity-75 hidden z-50">
+        <!-- Ajuste para ancho 100% en móvil -->
+        <div class="relative max-w-lg w-full h-full ml-auto shadow-2xl overflow-y-auto"> 
+            <header class="sticky top-0 p-4 border-b flex justify-between items-center">
+                <h3 class="text-xl font-bold text-white">Fila de Reproducción</h3>
+                <button id="close-queue-btn" class="text-gray-400 hover:text-white">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                </button>
+            </header>
+            <div id="queue-list" class="p-4 space-y-3">
+                <!-- Los temas en la fila se inyectarán aquí (Contenedor para SortableJS) -->
+            </div>
+            <footer id="empty-queue-footer" class="p-4 text-center text-gray-500 hidden">
+                La fila está vacía. Añade temas desde el listado.
+            </footer>
+        </div>
+    </div>
+
+    <script>
+        // --- Variables de Estado y Configuración ---
+        let allData = [];
+        let filteredData = []; 
+        let currentPage = 1;
+        const pageSize = 50; 
+        let loadAll = false;
+        let uniqueSearchTerms = new Set();
+        
+        // --- Variables de Reproducción (NUEVO) ---
+        // Se inicializan como arrays vacíos, pero se cargan desde localStorage en loadData.
+        let playlist = [];
+        let currentTrackIndex = -1;
+        
+        // --- Elementos del DOM ---
+        const resultsContainer = document.getElementById('results-container');
+        const searchInput = document.getElementById('search-input');
+        const yearSelect = document.getElementById('year-select');
+        const sortSelect = document.getElementById('sort-select'); 
+        const resultCount = document.getElementById('result-count');
+        const displayCountSpan = document.getElementById('display-count');
+        const loadingMessage = document.getElementById('loading-message');
+        const errorMessage = document.getElementById('error-message');
+        const paginationControls = document.getElementById('pagination-controls');
+        const autocompleteList = document.getElementById('autocomplete-list');
+
+        // Elementos del Reproductor Flotante
+        const floatingPlayerUI = document.getElementById('floating-player-ui');
+        const audioElement = document.getElementById('audio-element');
+        const playPauseBtn = document.getElementById('play-pause-btn');
+        const playIcon = document.getElementById('play-icon');
+        const pauseIcon = document.getElementById('pause-icon');
+        const prevBtn = document.getElementById('prev-btn');
+        const nextBtn = document.getElementById('next-btn');
+        const playerTitle = document.getElementById('player-title');
+        const playerArtist = document.getElementById('player-artist');
+        const volumeSlider = document.getElementById('volume-slider');
+        const queueBtn = document.getElementById('queue-btn');
+        const queueCount = document.getElementById('queue-count');
+        const queueModal = document.getElementById('queue-modal');
+        const queueList = document.getElementById('queue-list');
+        const closeQueueBtn = document.getElementById('close-queue-btn');
+        const emptyQueueFooter = document.getElementById('empty-queue-footer');
+
+        // URL del CSV publicado en Google Sheets (TU ENLACE REAL)
+        const GOOGLE_SHEETS_CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQJ3KYSabDsXSjFB9sxw1xdtUXP-xbXoqipqGtLJ_WwLy9tRNppHMJYt5bq8uBLA7U6t9NaUgzqUjoe/pub?gid=1068190739&single=true&output=csv';
+        
+        // Función de utilidad para eliminar tildes y normalizar texto
+        function normalizeText(text) {
+            if (!text) return '';
+            return text.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+        }
+
+
+        /**
+         * Función de utilidad para parsear CSV a Array de Objetos.
+         */
+        function csvToArray(text) {
+            const lines = text.replace(/\r/g, '').split('\n').filter(line => line.trim() !== '');
+            if (lines.length <= 1) return [];
+
+            const headers = lines[0].split(',')
+                .map(header => header.trim().replace(/^['"]|['"]$/g, '').toLowerCase());
+
+            const result = [];
+            const FIELD_SPLIT_REGEX = /,(?=(?:(?:[^"]*"){2})*[^"]*$)/;
+            const termsSet = new Set(); 
+
+            for (let i = 1; i < lines.length; i++) {
+                let rawLine = lines[i].trim();
+                if (!rawLine) continue;
+
+                let fields = rawLine.split(FIELD_SPLIT_REGEX);
+                let currentLine = fields.map(field => field.trim().replace(/^['"]|['"]$/g, '').trim());
+
+                const obj = {};
+                currentLine = currentLine.slice(0, headers.length); 
+
+                if (currentLine.length === headers.length) {
+                    for (let j = 0; j < headers.length; j++) {
+                        const header = headers[j];
+                        const value = currentLine[j];
+                        
+                        // Añadimos una clave única basada en el ID para buscar en la playlist
+                        obj['unique_id'] = Number(currentLine[0]); 
+                        obj[header] = (header === 'id' || header === 'año') ? Number(value) : value;
+
+
+                        if (header === 'agrupacion' || header === 'tema') {
+                            if (value && value.trim() !== '') {
+                                termsSet.add(value.trim());
+                            }
+                        }
+                    }
+                    
+                    if (obj.agrupacion && obj.agrupacion.trim() !== '') {
+                        result.push(obj);
+                    }
+                } else {
+                    console.warn(`[CSV PARSER WARNING] Registro descartado en la línea ${i + 1}. Longitud esperada: ${headers.length}, Obtenida: ${currentLine.length}.`);
+                }
+            }
+            uniqueSearchTerms = termsSet;
+            return result;
+        }
+
+        /**
+         * Simula la carga de datos desde la URL del CSV.
+         */
+        async function loadData() {
+            loadingMessage.classList.remove('hidden');
+            errorMessage.classList.add('hidden');
+
+            try {
+                const response = await fetch(GOOGLE_SHEETS_CSV_URL);
+                
+                if (!response.ok) {
+                    throw new Error(`Error al acceder al recurso (HTTP ${response.status}).`);
+                }
+                const csvText = await response.text();
+                allData = csvToArray(csvText);
+
+                if (allData.length === 0) {
+                     throw new Error("No se encontraron registros de datos. Verifica que la hoja no esté vacía.");
+                }
+                
+            } catch (error) {
+                console.error("Fallo al cargar la data:", error);
+                errorMessage.classList.remove('hidden'); 
+                loadingMessage.classList.add('hidden');
+                resultsContainer.innerHTML = ''; 
+                return;
+            } finally {
+                loadingMessage.classList.add('hidden');
+                
+                // 1. Cargar el estado de la playlist desde localStorage (NUEVO)
+                loadPlaylistState();
+                
+                // 2. Inicializar filtros, renderizado e interacción
+                initializeFilters(allData);
+                filterAndRender(); 
+                initializeSortableQueue();
+                
+                // 3. Si hay temas cargados, iniciar el reproductor flotante
+                if (playlist.length > 0) {
+                    const currentTrack = playlist[currentTrackIndex];
+                    // Si el audio está activo o pausado, mostrar UI
+                    if (currentTrack) {
+                        floatingPlayerUI.classList.remove('hidden');
+                        audioElement.src = currentTrack.enlace_descarga;
+                        updateFloatingPlayer(currentTrack);
+                        updatePlaybackControls();
+                    }
+                }
+            }
+        }
+        
+        // --- PERSISTENCIA DE LA PLAYLIST (NUEVO) ---
+
+        function savePlaylistState() {
+            try {
+                const state = {
+                    playlist: playlist,
+                    currentTrackIndex: currentTrackIndex
+                };
+                localStorage.setItem('gaita_playlist', JSON.stringify(state));
+                localStorage.setItem('gaita_volume', volumeSlider.value);
+            } catch (e) {
+                console.warn('No se pudo guardar la playlist en localStorage.', e);
+            }
+        }
+
+        function loadPlaylistState() {
+            try {
+                const savedState = localStorage.getItem('gaita_playlist');
+                const savedVolume = localStorage.getItem('gaita_volume');
+
+                if (savedState) {
+                    const state = JSON.parse(savedState);
+                    playlist = state.playlist || [];
+                    currentTrackIndex = state.currentTrackIndex !== undefined ? state.currentTrackIndex : -1;
+                }
+                
+                if (savedVolume !== null) {
+                    volumeSlider.value = savedVolume;
+                    audioElement.volume = Number(savedVolume);
+                }
+
+                updateQueueUI();
+
+            } catch (e) {
+                console.warn('No se pudo cargar la playlist de localStorage.', e);
+            }
+        }
+
+        // Se usa para formatear la sección de créditos en las tarjetas.
+        function formatCredits(item) {
+            const parts = [];
+            if (item.autor_credito) parts.push(`Cantautor: ${item.autor_credito}`);
+            if (item.letra && item.musica && item.letra === item.musica) {
+                parts.push(`Letra y Música: ${item.letra}`);
+            } else {
+                if (item.letra) parts.push(`Letra: ${item.letra}`);
+                if (item.musica) parts.push(`Música: ${item.musica}`);
+            }
+            if (item.arreglo) parts.push(`Arreglo(s): ${item.arreglo}`);
+            if (item.solista) parts.push(`Solista(s): ${item.solista}`);
+            if (item.solista_invitado) parts.push(`Solista Invitado: ${item.solista_invitado}`);
+            return parts.join(' • ');
+        }
+
+        function initializeFilters(data) {
+            const years = [...new Set(data.map(item => String(item.año)).filter(Boolean))].sort((a, b) => b - a); 
+            years.forEach(year => {
+                const option = document.createElement('option');
+                option.value = year;
+                option.textContent = year;
+                yearSelect.appendChild(option);
+            });
+        }
+        
+        function applySorting(data, sortValue) {
+            if (sortValue === 'id_asc') {
+                return data.slice().sort((a, b) => a.id - b.id);
+            }
+            const [field, direction] = sortValue.split('_');
+
+            return data.slice().sort((a, b) => {
+                const valA = (a[field] || '').toString().toUpperCase();
+                const valB = (b[field] || '').toString().toUpperCase();
+
+                let comparison = 0;
+                
+                if (field === 'año') {
+                    comparison = (Number(a.año) || 0) - (Number(b.año) || 0);
+                } else {
+                    if (valA > valB) {
+                        comparison = 1;
+                    } else if (valA < valB) {
+                        comparison = -1;
+                    }
+                }
+                return direction === 'asc' ? comparison : comparison * -1;
+            });
+        }
+
+        /**
+         * Función para resaltar el texto buscado dentro de una cadena.
+         */
+        function highlightText(text, highlight) {
+            if (!highlight) return text;
+            
+            const normalizedHighlight = normalizeText(highlight);
+            const escapedHighlight = normalizedHighlight.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
+            const regex = new RegExp(escapedHighlight, 'gi');
+            const normalizedText = normalizeText(text);
+            const matches = [...normalizedText.matchAll(regex)];
+
+            if (matches.length === 0) {
+                return text;
+            }
+
+            let result = '';
+            let lastIndex = 0;
+
+            for (const match of matches) {
+                const matchIndex = match.index;
+                const matchLength = match[0].length;
+                
+                result += text.substring(lastIndex, matchIndex);
+                result += `<mark>${text.substring(matchIndex, matchIndex + matchLength)}</mark>`;
+                lastIndex = matchIndex + matchLength;
+            }
+
+            result += text.substring(lastIndex);
+            return result;
+        }
+
+        /**
+         * Función principal para filtrar y renderizar los resultados.
+         */
+        function filterAndRender() {
+            const searchText = searchInput.value.trim();
+            const normalizedSearchText = normalizeText(searchText);
+            const selectedYear = yearSelect.value;
+            const sortValue = sortSelect.value;
+            
+            autocompleteList.innerHTML = '';
+            currentPage = 1;
+            loadAll = false; 
+
+            let currentFilteredData = allData.filter(item => {
+                if (selectedYear && String(item.año) !== selectedYear) {
+                    return false;
+                }
+
+                if (searchText) {
+                    const searchableFields = [
+                        item.agrupacion, item.tema, item.autor_credito, item.letra, item.musica, 
+                        item.arreglo, item.solista, item.solista_invitado, String(item.año)
+                    ].filter(Boolean);
+                    
+                    const normalizedSearchableFields = searchableFields.map(field => normalizeText(field)).join(' ');
+                    
+                    return normalizedSearchableFields.includes(normalizedSearchText);
+                }
+
+                return true;
+            });
+            
+            filteredData = applySorting(currentFilteredData, sortValue);
+            renderResults();
+        }
+        
+        function handleAutocomplete() {
+            const input = searchInput.value.trim();
+            autocompleteList.innerHTML = '';
+
+            if (input.length < 2) return; 
+
+            const normalizedInput = normalizeText(input);
+            const suggestions = [];
+            const maxSuggestions = 8;
+            
+            for (const term of uniqueSearchTerms) {
+                const normalizedTerm = normalizeText(term);
+                if (normalizedTerm.includes(normalizedInput) && suggestions.length < maxSuggestions) {
+                    suggestions.push(term);
+                }
+            }
+            
+            if (suggestions.length > 0) {
+                suggestions.forEach(suggestion => {
+                    const item = document.createElement('div');
+                    item.classList.add('autocomplete-item');
+                    item.innerHTML = highlightText(suggestion, input);
+
+                    item.addEventListener('click', () => {
+                        searchInput.value = suggestion;
+                        autocompleteList.innerHTML = ''; 
+                        filterAndRender(); 
+                    });
+                    autocompleteList.appendChild(item);
+                });
+            }
+        }
+
+
+        /**
+         * Renderiza los resultados, aplicando paginación si no se ha solicitado "Cargar Todo".
+         */
+        function renderResults() {
+            resultsContainer.innerHTML = '';
+            resultCount.textContent = filteredData.length;
+            const searchText = searchInput.value.trim(); 
+            
+            if (filteredData.length === 0) {
+                displayCountSpan.textContent = '';
+                paginationControls.innerHTML = '';
+                resultsContainer.innerHTML = `
+                    <div class="text-center p-8 bg-yellow-50 rounded-xl border border-yellow-200">
+                        <p class="text-xl font-semibold text-yellow-700">No se encontraron resultados.</p>
+                        <p class="text-gray-600">Intenta ajustar tus criterios de búsqueda o filtros.</p>
+                    </div>
+                `;
+                return;
+            }
+
+            let dataToDisplay;
+            let displayMessage = '';
+
+            if (loadAll) {
+                dataToDisplay = filteredData;
+                displayMessage = `(Mostrando ${filteredData.length} de ${filteredData.length})`;
+            } else {
+                const startIndex = 0;
+                const endIndex = currentPage * pageSize;
+                dataToDisplay = filteredData.slice(startIndex, endIndex);
+                
+                const currentDisplayed = dataToDisplay.length;
+                displayMessage = `(Mostrando ${currentDisplayed} de ${filteredData.length})`;
+            }
+
+            displayCountSpan.textContent = displayMessage;
+
+            // Determina si el botón Añadir a Fila debe estar habilitado
+            // Se habilita si ya hay algo en la lista de reproducción
+            const isPlayerInitialized = playlist.length > 0;
+
+            // Crear tarjetas para cada tema
+            const htmlContent = dataToDisplay.map(item => {
+                const creditosText = formatCredits(item);
+                const descargaLink = item.enlace_descarga || '#';
+                const hasLink = descargaLink !== '#' && !!descargaLink;
+                
+                const highlightedTema = highlightText(item.tema, searchText);
+                const highlightedAgrupacion = highlightText(item.agrupacion, searchText);
+                const highlightedCreditos = highlightText(creditosText, searchText);
+
+                const categoriaHtml = item.categoria ? `<span class="inline-block bg-green-900 text-green-400 text-xs font-medium px-3 py-1 rounded-full">${item.categoria}</span>` : '';
+                
+                // Botones de Acción de Reproducción (Play y Añadir a Fila)
+                const actionButtons = hasLink ? `
+                    <!-- 1. Botón Play -->
+                    <button data-id="${item.id}" class="play-now-btn flex-1 inline-flex items-center justify-center px-4 py-2 bg-[#1DB954] text-gray-900 font-bold rounded-full shadow-md hover:bg-[#1ed760] transition duration-150 text-sm">
+                         <svg class="w-5 h-5 mr-1" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clip-rule="evenodd"></path></svg>
+                        Play
+                    </button>
+                    <!-- 2. Botón Añadir -->
+                    <button data-id="${item.id}" class="add-to-queue-btn flex-1 inline-flex items-center justify-center px-4 py-2 bg-[#535353] text-white font-medium rounded-full shadow-md ${!isPlayerInitialized ? 'opacity-50 cursor-not-allowed' : 'hover:bg-[#686868]'} transition duration-150 text-sm ml-2" ${!isPlayerInitialized ? 'disabled' : ''}>
+                         <svg class="w-5 h-5 mr-1" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 5a1 1 0 011 1v3h3a1 1 0 110 2h-3v3a1 1 0 11-2 0v-3H6a1 1 0 110-2h3V6a1 1 0 011-1z" clip-rule="evenodd"></path></svg>
+                        Añadir
+                    </button>
+                ` : ``;
+                
+                const downloadButton = hasLink ? `
+                    <!-- Botón de Descarga -->
+                    <a href="${descargaLink}" target="_blank" download="${item.agrupacion} - ${item.tema}.mp3" ${!hasLink ? 'disabled' : ''} class="flex-1 inline-flex items-center justify-center px-4 py-2 bg-gray-500 text-white font-medium rounded-full shadow-md ${!hasLink ? 'opacity-50 cursor-not-allowed' : 'hover:bg-gray-600'} transition duration-150 text-sm mt-2 md:mt-0">
+                        <svg class="w-5 h-5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+                        ${!hasLink ? 'Enlace no disponible' : 'Descargar Tema'}
+                    </a>
+                ` : `<span class="text-xs text-gray-600 mt-2">Enlace de descarga no disponible.</span>`;
+
+                return `
+                    <div class="container-bg p-5 rounded-xl border border-[#333] transition duration-300 ease-in-out hover:shadow-xl hover:border-[#1DB954]">
+                        <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-3">
+                            <!-- Información principal del tema -->
+                            <div>
+                                <h2 class="text-xl md:text-2xl font-bold text-white">${highlightedTema}</h2>
+                                <p class="text-base md:text-lg text-gray-300 font-semibold">${highlightedAgrupacion}</p>
+                            </div>
+                            
+                            <!-- Año (Tag) -->
+                            <div class="flex gap-2 mt-2 md:mt-0">
+                                ${categoriaHtml}
+                                <span class="inline-block bg-gray-600 text-gray-200 text-xs font-medium px-3 py-1 rounded-full">Año: ${item.año || 'N/A'}</span>
+                            </div>
+                        </div>
+
+                        <!-- Créditos y Descripción -->
+                        <p class="text-sm text-gray-400 mb-4 border-l-4 border-gray-600 pl-3 italic">${highlightedCreditos}</p>
+                        
+                        <!-- Controles de Reproducción y Descarga (MOBILE: 3 botones apilados verticalmente) -->
+                        <div class="flex flex-col sm:flex-row sm:gap-2 mt-3">
+                            <div class="flex flex-row w-full mb-2 sm:mb-0">
+                                ${actionButtons}
+                            </div>
+                            ${downloadButton}
+                        </div>
+                    </div>
+                `;
+            }).join('');
+
+            resultsContainer.innerHTML = htmlContent;
+            renderPaginationControls(dataToDisplay.length);
+            attachQueueListeners(); // Conectar botones de añadir a fila
+        }
+
+        /**
+         * Renderiza los botones de "Ver Más" y "Cargar Todo".
+         */
+        function renderPaginationControls(currentDisplayedCount) {
+            paginationControls.innerHTML = '';
+            
+            if (filteredData.length <= currentDisplayedCount || loadAll) {
+                if (loadAll && filteredData.length > pageSize) {
+                     const resetBtn = createButton('Mostrar 50 Iniciales', 'text-[#1DB954] hover:text-[#1ed760] font-normal text-sm', () => {
+                        loadAll = false;
+                        currentPage = 1;
+                        renderResults();
+                    });
+                    paginationControls.appendChild(resetBtn);
+                }
+                return;
+            }
+
+            const remaining = filteredData.length - currentDisplayedCount;
+            const nextBatchSize = Math.min(pageSize, remaining);
+            
+            if (remaining > 0) {
+                const loadMoreBtn = createButton(`Ver más ${nextBatchSize} temas`, 'bg-[#535353] text-white hover:bg-[#686868] text-base', () => {
+                    currentPage++;
+                    renderResults();
+                });
+                paginationControls.appendChild(loadMoreBtn);
+            }
+            
+            const loadAllBtn = createButton(`Cargar los ${filteredData.length} temas`, 'bg-gray-700 text-gray-300 hover:bg-gray-600 text-base', () => {
+                loadAll = true;
+                renderResults();
+            });
+            paginationControls.appendChild(loadAllBtn);
+        }
+
+        /**
+         * Crea un botón genérico para los controles.
+         */
+        function createButton(text, classes, clickHandler) {
+            const button = document.createElement('button');
+            button.textContent = text;
+            // Clases base para asegurar tamaño táctil
+            button.className = `px-6 py-3 font-semibold rounded-full transition duration-150 min-h-[44px] ${classes}`; 
+            button.addEventListener('click', clickHandler);
+            return button;
+        }
+
+
+        // --- LÓGICA DEL REPRODUCTOR Y LA FILA ---
+        
+        // Inicializar SortableJS para Drag and Drop
+        let sortableInstance;
+        function initializeSortableQueue() {
+            if (sortableInstance) {
+                sortableInstance.destroy();
+            }
+            sortableInstance = Sortable.create(queueList, {
+                animation: 150,
+                group: 'playlist',
+                handle: '.drag-handle', 
+                ghostClass: 'sortable-ghost',
+                dataIdAttr: 'data-index',
+                onUpdate: function (evt) {
+                    const oldIndex = evt.oldIndex;
+                    const newIndex = evt.newIndex;
+                    
+                    // 1. Actualizar el array playlist basado en el DOM
+                    const movedItem = playlist.splice(oldIndex, 1)[0];
+                    playlist.splice(newIndex, 0, movedItem);
+
+                    // 2. Ajustar el currentTrackIndex
+                    if (oldIndex === currentTrackIndex) {
+                        currentTrackIndex = newIndex;
+                    } else if (oldIndex < currentTrackIndex && newIndex >= currentTrackIndex) {
+                        currentTrackIndex--;
+                    } else if (oldIndex > currentTrackIndex && newIndex <= currentTrackIndex) {
+                        currentTrackIndex++;
+                    }
+                    
+                    savePlaylistState(); // Guardar el nuevo orden
+                    renderQueue(); 
+                    updatePlaybackControls();
+                },
+            });
+        }
+        
+        /**
+         * Añade un tema a la fila y opcionalmente lo reproduce inmediatamente.
+         */
+        function handlePlayAction(itemId, playImmediately = false) {
+            const item = allData.find(d => d.id === Number(itemId));
+            if (!item || !item.enlace_descarga) return;
+            
+            floatingPlayerUI.classList.remove('hidden');
+
+            if (playImmediately) {
+                // 1. Insertar el nuevo tema al principio de la fila
+                playlist.unshift(item);
+                currentTrackIndex = 0;
+            } else {
+                // 2. Añadir al final (solo si no es playImmediately)
+                playlist.push(item);
+            }
+
+            // Eliminar duplicados si el tema ya estaba en la fila
+            if (playlist.length > 1) {
+                 const uniquePlaylist = [];
+                 const idsSeen = new Set();
+                 
+                 // Recorrer de forma inversa para mantener la prioridad de los nuevos elementos
+                 for (let i = playlist.length - 1; i >= 0; i--) {
+                     const currentItem = playlist[i];
+                     if (!idsSeen.has(currentItem.id)) {
+                         uniquePlaylist.unshift(currentItem);
+                         idsSeen.add(currentItem.id);
+                     } else if (i === currentTrackIndex) {
+                         // Si el duplicado es el tema actual, aseguramos que currentTrackIndex apunte al nuevo tema
+                         currentTrackIndex = uniquePlaylist.findIndex(t => t.id === currentItem.id);
+                     }
+                 }
+                 playlist = uniquePlaylist;
+
+                 // Ajustar el currentTrackIndex después de la deduplicación
+                 if (playImmediately) {
+                     currentTrackIndex = 0;
+                 } else if (currentTrackIndex > -1) {
+                     // Asegurarse de que el índice actual es correcto después de limpiar duplicados
+                     const currentId = playlist[currentTrackIndex]?.id;
+                     currentTrackIndex = playlist.findIndex(t => t.id === currentId);
+                     if (currentTrackIndex === -1) currentTrackIndex = 0; // Fallback
+                 }
+            }
+            
+            updateQueueUI();
+            
+            // Si es Play (inmediato) o si la fila estaba vacía, iniciar la reproducción
+            if (playImmediately || (playlist.length === 1 && currentTrackIndex === 0)) {
+                 playTrack(currentTrackIndex, true);
+            }
+            
+            // Re-renderizar los resultados para habilitar/deshabilitar el botón "Añadir"
+            // Solo es necesario si la lista de resultados está visible
+            if (!loadAll || filteredData.length <= pageSize) {
+                renderResults(); 
+            } else {
+                // En modo Cargar Todo, solo actualizamos los listeners
+                attachQueueListeners();
+            }
+
+            savePlaylistState();
+            renderQueue();
+        }
+
+        /**
+         * Reproduce un tema de la fila.
+         */
+        function playTrack(index, autoPlay = true) {
+            if (index < 0 || index >= playlist.length) {
+                stopPlayback();
+                return;
+            }
+            
+            currentTrackIndex = index;
+            const track = playlist[index];
+            
+            audioElement.src = track.enlace_descarga;
+            updateFloatingPlayer(track);
+
+            if (autoPlay) {
+                // Intentar reproducir. Usamos un catch para manejar el bloqueo de autoplay.
+                audioElement.play().catch(error => {
+                    console.error("Error al intentar reproducir (Autoplay bloqueado):", error);
+                });
+            }
+            updatePlaybackControls();
+            renderQueue(); // Actualiza el resaltado en el modal
+            savePlaylistState(); // Guarda el índice actual
+        }
+
+        /**
+         * Detiene la reproducción y limpia el estado del reproductor.
+         */
+        function stopPlayback() {
+            audioElement.pause();
+            audioElement.src = '';
+            updateFloatingPlayer(null);
+            currentTrackIndex = -1;
+            updatePlaybackControls();
+            savePlaylistState();
+        }
+
+        /**
+         * Actualiza la interfaz del reproductor flotante (títulos, botones).
+         */
+        function updateFloatingPlayer(track) {
+            if (track) {
+                playerTitle.textContent = track.tema;
+                playerArtist.textContent = track.agrupacion;
+            } else {
+                playerTitle.textContent = "Ningún tema seleccionado";
+                playerArtist.textContent = "Agrega temas a la fila.";
+            }
+        }
+        
+        /**
+         * Alterna entre íconos de play y pause.
+         * Habilita/deshabilita Anterior/Siguiente.
+         */
+        function updatePlaybackControls() {
+            // Se realiza la verificación de paused después de que el elemento de audio se haya cargado
+            const isPaused = audioElement.paused;
+
+            if (isPaused) {
+                playIcon.classList.remove('hidden');
+                pauseIcon.classList.add('hidden');
+            } else {
+                playIcon.classList.add('hidden');
+                pauseIcon.classList.remove('hidden');
+            }
+
+            // Habilitar/Deshabilitar Siguiente/Anterior
+            const canGoPrev = currentTrackIndex > 0;
+            const canGoNext = currentTrackIndex < playlist.length - 1;
+            
+            prevBtn.disabled = !canGoPrev;
+            nextBtn.disabled = !canGoNext;
+            
+            prevBtn.classList.toggle('text-gray-400', !canGoPrev);
+            prevBtn.classList.toggle('text-white', canGoPrev);
+            nextBtn.classList.toggle('text-gray-400', !canGoNext);
+            nextBtn.classList.toggle('text-white', canGoNext);
+            
+            // Asegurar que el botón de Añadir de la lista principal esté actualizado
+            renderResults();
+        }
+
+        /**
+         * Muestra/oculta la lista de reproducción.
+         */
+        function renderQueue() {
+            queueList.innerHTML = '';
+            updateQueueUI();
+            
+            if (playlist.length === 0) {
+                emptyQueueFooter.classList.remove('hidden');
+                return;
+            }
+
+            emptyQueueFooter.classList.add('hidden');
+
+            playlist.forEach((track, index) => {
+                const isCurrent = index === currentTrackIndex;
+                const itemDiv = document.createElement('div');
+                // Almacenar el índice actual en el DOM para SortableJS
+                itemDiv.dataset.index = index; 
+                itemDiv.classList.add('queue-item');
+                
+                // Usamos itemDiv.innerHTML para crear el elemento que se puede arrastrar
+                itemDiv.innerHTML = `
+                    <div class="flex items-center p-3 rounded-lg transition ${isCurrent ? 'bg-green-900/50 border-l-4 border-[#1DB954]' : 'hover:bg-[#333]'}" data-item-index="${index}">
+                        <!-- Handle de Arrastre -->
+                        <span class="drag-handle mr-3 text-gray-400 hover:text-white cursor-grab">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path></svg>
+                        </span>
+                        
+                        <div class="min-w-0 flex-1 cursor-pointer" onclick="playTrack(${index}, true)">
+                            <p class="text-sm font-semibold truncate ${isCurrent ? 'text-[#1DB954]' : 'text-white'}">${index + 1}. ${track.tema}</p>
+                            <p class="text-xs text-gray-400 truncate">${track.agrupacion}</p>
+                        </div>
+                        
+                        <button data-index="${index}" class="remove-from-queue-btn text-red-500 hover:text-red-300 ml-3" title="Eliminar de la fila">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                        </button>
+                    </div>
+                `;
+                queueList.appendChild(itemDiv);
+            });
+            
+            // Adjuntar listeners para eliminar temas
+            document.querySelectorAll('.remove-from-queue-btn').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    const index = parseInt(e.currentTarget.dataset.index);
+                    removeFromQueue(index);
+                });
+            });
+        }
+        
+        /**
+         * Elimina un tema de la fila.
+         */
+        function removeFromQueue(index) {
+            
+            if (index === currentTrackIndex) {
+                // Eliminamos el tema actual
+                audioElement.pause();
+                playlist.splice(index, 1);
+                
+                if (playlist.length > 0) {
+                    const nextIndex = (index < playlist.length) ? index : playlist.length - 1;
+                    playTrack(nextIndex, true); 
+                } else {
+                    // Si la lista queda vacía
+                    stopPlayback();
+                    floatingPlayerUI.classList.add('hidden');
+                }
+            } else {
+                playlist.splice(index, 1);
+                if (index < currentTrackIndex) {
+                    currentTrackIndex--;
+                }
+            }
+            updateQueueUI();
+            renderQueue();
+            updatePlaybackControls();
+            savePlaylistState();
+        }
+
+
+        /**
+         * Actualiza el contador de la fila.
+         */
+        function updateQueueUI() {
+            queueCount.textContent = playlist.length;
+        }
+
+
+        /**
+         * Adjunta listeners a los botones "Play" y "Añadir a Fila" recién renderizados.
+         */
+        function attachQueueListeners() {
+            // Botón Play
+            document.querySelectorAll('.play-now-btn').forEach(button => {
+                button.addEventListener('click', (e) => {
+                    const itemId = e.currentTarget.dataset.id;
+                    handlePlayAction(itemId, true); 
+                });
+            });
+            
+            // Botón Añadir (Solo se activa si está habilitado)
+            document.querySelectorAll('.add-to-queue-btn:not([disabled])').forEach(button => {
+                button.addEventListener('click', (e) => {
+                    const itemId = e.currentTarget.dataset.id;
+                    handlePlayAction(itemId, false); 
+                });
+            });
+        }
+
+
+        // --- EVENT LISTENERS DEL REPRODUCTOR FLOTANTE ---
+
+        // Play/Pause
+        playPauseBtn.addEventListener('click', () => {
+            if (currentTrackIndex === -1 && playlist.length > 0) {
+                 // Si está pausado y no hay índice, iniciar desde el principio
+                 playTrack(0, true);
+                 return;
+            }
+            if (playlist.length === 0) return;
+
+            if (audioElement.paused) {
+                audioElement.play();
+            } else {
+                audioElement.pause();
+            }
+        });
+
+        // Siguiente tema
+        nextBtn.addEventListener('click', () => {
+            if (currentTrackIndex < playlist.length - 1) {
+                playTrack(currentTrackIndex + 1, true);
+            }
+        });
+
+        // Tema anterior
+        prevBtn.addEventListener('click', () => {
+            if (currentTrackIndex > 0) {
+                playTrack(currentTrackIndex - 1, true);
+            }
+        });
+
+        // Autoplay del siguiente tema al finalizar
+        audioElement.addEventListener('ended', () => {
+            if (currentTrackIndex < playlist.length - 1) {
+                playTrack(currentTrackIndex + 1, true);
+            } else {
+                // Si termina el último tema, detener y esperar
+                stopPlayback();
+            }
+        });
+
+        // Actualizar UI en eventos de audio
+        audioElement.addEventListener('play', updatePlaybackControls);
+        audioElement.addEventListener('pause', updatePlaybackControls);
+
+        // Control de volumen y persistencia (NUEVO)
+        volumeSlider.addEventListener('input', (e) => {
+            audioElement.volume = e.target.value;
+            localStorage.setItem('gaita_volume', e.target.value);
+        });
+        
+        // Modal de Fila
+        queueBtn.addEventListener('click', () => {
+            renderQueue();
+            queueModal.classList.remove('hidden');
+        });
+
+        closeQueueBtn.addEventListener('click', () => {
+            queueModal.classList.add('hidden');
+        });
+
+        // --- Configuración de Event Listeners Iniciales ---
+        searchInput.addEventListener('input', () => {
+            filterAndRender();
+            handleAutocomplete();
+        });
+        
+        document.addEventListener('click', (e) => {
+            if (e.target.closest('#autocomplete-container') === null) {
+                autocompleteList.innerHTML = '';
+            }
+        });
+
+        yearSelect.addEventListener('change', filterAndRender);
+        sortSelect.addEventListener('change', filterAndRender); 
+
+        // Iniciar la aplicación
+        loadData();
+    </script>
+</body>
+</html>
