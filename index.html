@@ -77,6 +77,7 @@
             z-index: 50;
             border-top: 1px solid #333;
             background-color: #181818; /* Aún más oscuro */
+            padding: 10px 16px; /* Aumento de padding para más altura */
         }
         
         /* Estilos para Drag and Drop en la Fila */
@@ -103,6 +104,30 @@
             #queue-modal > div {
                 max-width: 100%; /* Cubre todo el ancho del móvil */
             }
+            #floating-player-ui .space-x-4 button {
+                padding: 4px; /* Asegurar que los botones sean grandes */
+            }
+        }
+
+        /* Notificación Toast */
+        #toast-notification {
+            position: fixed;
+            bottom: 100px; /* Sobre la barra del reproductor */
+            right: 16px;
+            z-index: 60;
+            background-color: #1DB954;
+            color: #121212;
+            padding: 12px 20px;
+            border-radius: 8px;
+            font-weight: 600;
+            opacity: 0;
+            transition: opacity 0.3s, transform 0.3s;
+            transform: translateY(20px);
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.4);
+        }
+        #toast-notification.show {
+            opacity: 1;
+            transform: translateY(0);
         }
     </style>
 </head>
@@ -209,12 +234,18 @@
                 </div>
 
                 <!-- Botón de Fila/Playlist (Abre un modal virtual) -->
-                <button id="queue-btn" class="relative px-3 py-1 text-sm rounded-lg bg-[#535353] hover:bg-[#686868] transition text-white">
+                <button id="queue-btn" class="relative px-3 py-1 text-sm rounded-lg bg-[#535353] hover:bg-[#686868] transition text-white min-h-[44px]">
                     Fila (<span id="queue-count">0</span>)
                 </button>
             </div>
         </div>
     </div>
+    
+    <!-- NOTIFICACIÓN TOAST (Para "Tema Añadido") -->
+    <div id="toast-notification" role="alert">
+        Tema añadido a la fila.
+    </div>
+
 
     <!-- Modal de la Fila de Reproducción -->
     <div id="queue-modal" class="fixed inset-0 bg-gray-900 bg-opacity-75 hidden z-50">
@@ -278,6 +309,7 @@
         const queueList = document.getElementById('queue-list');
         const closeQueueBtn = document.getElementById('close-queue-btn');
         const emptyQueueFooter = document.getElementById('empty-queue-footer');
+        const toastNotification = document.getElementById('toast-notification'); // NUEVO TOAST
 
         // URL del CSV publicado en Google Sheets (TU ENLACE REAL)
         const GOOGLE_SHEETS_CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQJ3KYSabDsXSjFB9sxw1xdtUXP-xbXoqipqGtLJ_WwLy9tRNppHMJYt5bq8uBLA7U6t9NaUgzqUjoe/pub?gid=1068190739&single=true&output=csv';
@@ -639,12 +671,12 @@
                 // Botones de Acción de Reproducción (Play y Añadir a Fila)
                 const actionButtons = hasLink ? `
                     <!-- 1. Botón Play -->
-                    <button data-id="${item.id}" class="play-now-btn flex-1 inline-flex items-center justify-center px-4 py-2 bg-[#1DB954] text-gray-900 font-bold rounded-full shadow-md hover:bg-[#1ed760] transition duration-150 text-sm">
+                    <button data-id="${item.id}" class="play-now-btn flex-1 inline-flex items-center justify-center px-4 py-2 bg-[#1DB954] text-gray-900 font-bold rounded-full shadow-md hover:bg-[#1ed760] transition duration-150 text-sm min-h-[44px]">
                          <svg class="w-5 h-5 mr-1" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clip-rule="evenodd"></path></svg>
                         Play
                     </button>
                     <!-- 2. Botón Añadir -->
-                    <button data-id="${item.id}" class="add-to-queue-btn flex-1 inline-flex items-center justify-center px-4 py-2 bg-[#535353] text-white font-medium rounded-full shadow-md ${!isPlayerInitialized ? 'opacity-50 cursor-not-allowed' : 'hover:bg-[#686868]'} transition duration-150 text-sm ml-2" ${!isPlayerInitialized ? 'disabled' : ''}>
+                    <button data-id="${item.id}" class="add-to-queue-btn flex-1 inline-flex items-center justify-center px-4 py-2 bg-[#535353] text-white font-medium rounded-full shadow-md ${!isPlayerInitialized ? 'opacity-50 cursor-not-allowed' : 'hover:bg-[#686868]'} transition duration-150 text-sm ml-2 min-h-[44px]" ${!isPlayerInitialized ? 'disabled' : ''}>
                          <svg class="w-5 h-5 mr-1" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 5a1 1 0 011 1v3h3a1 1 0 110 2h-3v3a1 1 0 11-2 0v-3H6a1 1 0 110-2h3V6a1 1 0 011-1z" clip-rule="evenodd"></path></svg>
                         Añadir
                     </button>
@@ -652,7 +684,7 @@
                 
                 const downloadButton = hasLink ? `
                     <!-- Botón de Descarga -->
-                    <a href="${descargaLink}" target="_blank" download="${item.agrupacion} - ${item.tema}.mp3" ${!hasLink ? 'disabled' : ''} class="flex-1 inline-flex items-center justify-center px-4 py-2 bg-gray-500 text-white font-medium rounded-full shadow-md ${!hasLink ? 'opacity-50 cursor-not-allowed' : 'hover:bg-gray-600'} transition duration-150 text-sm mt-2 md:mt-0">
+                    <a href="${descargaLink}" target="_blank" download="${item.agrupacion} - ${item.tema}.mp3" ${!hasLink ? 'disabled' : ''} class="flex-1 inline-flex items-center justify-center px-4 py-2 bg-gray-500 text-white font-medium rounded-full shadow-md ${!hasLink ? 'opacity-50 cursor-not-allowed' : 'hover:bg-gray-600'} transition duration-150 text-sm mt-2 md:mt-0 min-h-[44px]">
                         <svg class="w-5 h-5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
                         ${!hasLink ? 'Enlace no disponible' : 'Descargar Tema'}
                     </a>
@@ -781,6 +813,17 @@
         }
         
         /**
+         * Muestra una notificación temporal al usuario.
+         */
+        function showToast(message) {
+            toastNotification.textContent = message;
+            toastNotification.classList.add('show');
+            setTimeout(() => {
+                toastNotification.classList.remove('show');
+            }, 3000); // Ocultar después de 3 segundos
+        }
+
+        /**
          * Añade un tema a la fila y opcionalmente lo reproduce inmediatamente.
          */
         function handlePlayAction(itemId, playImmediately = false) {
@@ -789,6 +832,9 @@
             
             floatingPlayerUI.classList.remove('hidden');
 
+            // Verificar si el tema ya está en la playlist para evitar duplicados en el toast
+            const isDuplicate = playlist.some(t => t.id === item.id);
+            
             if (playImmediately) {
                 // 1. Insertar el nuevo tema al principio de la fila
                 playlist.unshift(item);
@@ -797,7 +843,7 @@
                 // 2. Añadir al final (solo si no es playImmediately)
                 playlist.push(item);
             }
-
+            
             // Eliminar duplicados si el tema ya estaba en la fila
             if (playlist.length > 1) {
                  const uniquePlaylist = [];
@@ -806,40 +852,41 @@
                  // Recorrer de forma inversa para mantener la prioridad de los nuevos elementos
                  for (let i = playlist.length - 1; i >= 0; i--) {
                      const currentItem = playlist[i];
+                     // Usamos ID para deduplicar, pero solo insertamos si no se ha visto
                      if (!idsSeen.has(currentItem.id)) {
                          uniquePlaylist.unshift(currentItem);
                          idsSeen.add(currentItem.id);
-                     } else if (i === currentTrackIndex) {
-                         // Si el duplicado es el tema actual, aseguramos que currentTrackIndex apunte al nuevo tema
-                         currentTrackIndex = uniquePlaylist.findIndex(t => t.id === currentItem.id);
                      }
                  }
+                 
+                 // Antes de asignar, encontrar la nueva posición del tema actual
+                 const currentTrackId = playlist[currentTrackIndex]?.id;
                  playlist = uniquePlaylist;
 
                  // Ajustar el currentTrackIndex después de la deduplicación
-                 if (playImmediately) {
-                     currentTrackIndex = 0;
-                 } else if (currentTrackIndex > -1) {
-                     // Asegurarse de que el índice actual es correcto después de limpiar duplicados
-                     const currentId = playlist[currentTrackIndex]?.id;
-                     currentTrackIndex = playlist.findIndex(t => t.id === currentId);
-                     if (currentTrackIndex === -1) currentTrackIndex = 0; // Fallback
-                 }
+                 currentTrackIndex = playlist.findIndex(t => t.id === currentTrackId);
+                 if (currentTrackIndex === -1 && playlist.length > 0) currentTrackIndex = 0; // Fallback si se elimina el actual
+
+            } else if (playlist.length === 1 && currentTrackIndex === -1) {
+                 // Si es el primer tema, inicializar el índice
+                 currentTrackIndex = 0;
             }
-            
+
+
             updateQueueUI();
             
             // Si es Play (inmediato) o si la fila estaba vacía, iniciar la reproducción
             if (playImmediately || (playlist.length === 1 && currentTrackIndex === 0)) {
                  playTrack(currentTrackIndex, true);
+                 showToast(`Reproduciendo: ${item.tema}`);
+            } else {
+                 showToast(`"${item.tema}" añadido a la fila.`);
             }
             
             // Re-renderizar los resultados para habilitar/deshabilitar el botón "Añadir"
-            // Solo es necesario si la lista de resultados está visible
             if (!loadAll || filteredData.length <= pageSize) {
                 renderResults(); 
             } else {
-                // En modo Cargar Todo, solo actualizamos los listeners
                 attachQueueListeners();
             }
 
@@ -921,6 +968,7 @@
             prevBtn.disabled = !canGoPrev;
             nextBtn.disabled = !canGoNext;
             
+            // Ajuste para el estado de los botones anterior/siguiente en el flotante
             prevBtn.classList.toggle('text-gray-400', !canGoPrev);
             prevBtn.classList.toggle('text-white', canGoPrev);
             nextBtn.classList.toggle('text-gray-400', !canGoNext);
